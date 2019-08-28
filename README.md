@@ -17,6 +17,8 @@ Output :
 1: 2 state images are neighbor  
 
 
+Author : thanhkaist
+
 
 
  
