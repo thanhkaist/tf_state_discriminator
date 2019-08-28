@@ -6,6 +6,8 @@ os.environ['TF_CPP_MIN_LOG_LEVEL']='3'
 import tensorflow as tf
 import time
 import numpy as np
+from tensorflow.python import debug as tf_debug
+## Haha 1231241421
 
 def preprocess_data(im1,im2,label):
     im1=tf.cast(im1,tf.float32)
@@ -19,7 +21,8 @@ def preprocess_data(im1,im2,label):
 
 def load_data_from_npz(no_train=800,no_test=200, path='pair_obs.npz'):
     data = np.load(path)
-    pair_obs_arr = data['pair_obs_arr']
+    #pair_obs_arr = data['pair_obs_arr']
+    pair_obs_arr = data['pair_goal']
     labels = data['labels']
     len = pair_obs_arr.shape[0]
     if len < (no_test +no_train):
@@ -32,6 +35,8 @@ def load_data_from_npz(no_train=800,no_test=200, path='pair_obs.npz'):
     img1s_test =pair_obs_arr[no_train:no_train+no_test,0]
     img2s_test =pair_obs_arr[no_train:no_train+no_test,1]
     labels_test = labels[no_train:no_train+no_test]
+    print(img1s.shape,img2s.shape,labels_t.shape)
+    print(labels_t[0:20])
     print(img1s_test.shape,img2s_test.shape,labels_test.shape)
     train_data = (img1s,img2s,labels_t)
     test_data = (img1s_test, img2s_test,labels_test)
@@ -50,7 +55,7 @@ def create_dataset_pipeline(data_tensor, is_train=True, num_threads=8, prefetch_
 def data_layer():
     with tf.variable_scope("data"):
         #data_train, data_val = tf.keras.datasets.mnist.load_data()
-        data_train, data_val = load_data_from_npz(800,200,"Data/pair_obs.npz")
+        data_train, data_val = load_data_from_npz(800,200,"Data/pair_goal.npz")
         dataset_train = create_dataset_pipeline(data_train, is_train=True)
         dataset_val = create_dataset_pipeline(data_val, is_train=False, batch_size=1)
         iterator = tf.data.Iterator.from_structure(dataset_train.output_types, dataset_train.output_shapes)
@@ -102,8 +107,8 @@ def target_discrim_model(s_img,t_img):
             # weights:   (5*5*6+1)*6
             # connections: (28*28*5*5+28*28)*6
             conv1_W = init_weight((5, 5, 6, 6))
-            conv1_b = init_bias(6)
-            conv1 = tf.nn.conv2d(bgr, conv1_W, strides=[1, 1, 1, 1], padding='VALID') + conv1_b
+            #conv1_b = init_bias(6)
+            conv1 = tf.nn.conv2d(bgr, conv1_W, strides=[1, 1, 1, 1], padding='VALID') #+ conv1_b
             conv1 = tf.nn.relu(conv1)
         # Input = 220x220x6. Output = 110x110x6.
         conv1 = tf.nn.max_pool(conv1, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='VALID')
@@ -112,8 +117,8 @@ def target_discrim_model(s_img,t_img):
             # input 110x110x6 Output = 108x108x16.
             # weights: (5*5*6+1)*16
             conv2_W = init_weight((3, 3, 6, 16))
-            conv2_b = init_bias(16)
-            conv2 = tf.nn.conv2d(conv1, conv2_W, strides=[1, 1, 1, 1], padding='VALID') + conv2_b
+            #conv2_b = init_bias(16)
+            conv2 = tf.nn.conv2d(conv1, conv2_W, strides=[1, 1, 1, 1], padding='VALID') #+ conv2_b
             conv2 = tf.nn.relu(conv2)
         # Input = 108x108x16. Output = 54x54x16.
         conv2 = tf.nn.max_pool(conv2, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='VALID')
@@ -123,8 +128,8 @@ def target_discrim_model(s_img,t_img):
             # weights: (3*3*16+1)*16
 
             conv3_W = init_weight((3, 3, 16, 8))
-            conv3_b = init_bias(8)
-            conv3 = tf.nn.conv2d(conv2, conv3_W, strides=[1, 1, 1, 1], padding='VALID') + conv3_b
+            #conv3_b = init_bias(8)
+            conv3 = tf.nn.conv2d(conv2, conv3_W, strides=[1, 1, 1, 1], padding='VALID') #+ conv3_b
             conv3 = tf.nn.relu(conv3)
         # Input = 52x52x16. Output = 26*26*8
         conv3 = tf.nn.max_pool(conv3, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='VALID')
@@ -133,26 +138,27 @@ def target_discrim_model(s_img,t_img):
             # Input = 26*26*8. Output = 5408
             net = tf.layers.flatten(conv3)
             assert net.get_shape().as_list()[1:] == [5408]
-            net = tf.layers.dense(net, 1024)
-            net = tf.nn.relu(net)
-            net = tf.layers.dense(net, 500)
-            net = tf.nn.relu(net)
-            net = tf.layers.dense(net, 2)
+            net = tf.layers.dense(net, 1024, activation=tf.nn.relu, name='fc_1')
+            #net = tf.nn.relu(net)
+            net = tf.layers.dense(net, 500, activation=tf.nn.relu, name='fc_2')
+            #net = tf.nn.relu(net)
+            net = tf.layers.dense(net, 2, name='fc_3')
         print(("build model finished: %ds" % (time.time() - start_time)))
         return net
 
 def loss_functions(logits, labels, num_classes=2):
     with tf.variable_scope("loss"):
         target_prob = tf.one_hot(labels, num_classes)
-        tf.losses.softmax_cross_entropy(target_prob, logits)
-        total_loss = tf.losses.get_total_loss() # include regularization loss
-    return total_loss
+        # total_loss = tf.losses.softmax_cross_entropy(target_prob, logits)
+        total_loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits_v2(labels=target_prob, logits=logits))
+        #total_loss = tf.losses.get_total_loss(False) # remove regularization loss
+    return total_loss, target_prob
 
 def optimizer_func_momentum(total_loss, global_step, learning_rate=0.01):
     with tf.variable_scope("optimizer"):
         lr_schedule = tf.train.exponential_decay(learning_rate=learning_rate,
                                                  global_step=global_step,
-                                                 decay_steps=25*5,
+                                                 decay_steps=25*2,
                                                  decay_rate=0.5,
                                                  staircase=True)
         update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
@@ -179,6 +185,8 @@ def performance_metric(logits, labels):
 
 
 def train():
+    np.random.seed(1000)
+    tf.random.set_random_seed(100)
     global_step = tf.Variable(1,dtype=tf.int32,trainable=False,name='iter_number')
 
     # defind the training graph
@@ -192,7 +200,7 @@ def train():
 
     logits = target_discrim_model(s_img, t_img)
 
-    loss = loss_functions(logits,labels,num_classes=2)
+    loss, target_dbg = loss_functions(logits,labels,num_classes=2)
     #optimizer = optimizer_func_adam(loss,global_step)
     optimizer = optimizer_func_momentum(loss,global_step)
     accuracy = performance_metric(logits,labels)
@@ -220,6 +228,7 @@ def train():
 
 
     with tf.Session() as sess:
+        sess = tf_debug.LocalCLIDebugWrapperSession(sess)
         sess.run(tf.global_variables_initializer())
         sess.run(init_op_train)
 
@@ -244,7 +253,7 @@ def train():
 
         for i in range(initial_step, num_iter + 1):
             # _, loss_batch, acc_batch = sess.run([optimizer, loss, accuracy], feed_dict={s_img:img1,t_img:img2,labels:ex_labls,training: True}) ##############################
-            _, loss_batch, acc_batch = sess.run([optimizer, loss, accuracy], feed_dict={training: True})
+            _, loss_batch, acc_batch, logits_dbg, trg_dbg = sess.run([optimizer, loss, accuracy, logits, target_dbg], feed_dict={training: True})
             streaming_loss += loss_batch
             streaming_accuracy += acc_batch
             if i % log_iter == 0:
@@ -365,5 +374,5 @@ def test(no_checkpoint):
 
 
 if __name__ == "__main__":
-    #train()
-    test(10)
+    train()
+    #test(10)

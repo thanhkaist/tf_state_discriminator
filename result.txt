@@ -1,4 +1,8 @@
-Iteration 108 : accuracy 90%
+
+
+Learning rate : 0.01 learning decay: every 200 iter batch size :32
+Train : 800 val : 200
+Iteration 109 : accuracy 90%
 
 
 
