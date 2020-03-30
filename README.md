@@ -5,7 +5,7 @@ This code provide training and testing code to create 2 classifier as below: \
 
 ### Target discriminator  
 Input: state image, target image \ 
-Output: 2 classe s\
+Output: 2 classes \
 - 0: state image is not target state 
 - 1: state image is target state 
 
