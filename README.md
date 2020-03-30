@@ -12,8 +12,8 @@ Output: 2 classes\
 ### Neighbor discriminator\
 Input: state image 1, state image 2 
 Output:2 classes\
-0: 2 state images are not neighbor
-1: 2 state images are neighbor  
+0: 2 state images are not neighbor\
+1: 2 state images are neighbor\
 
 To run the code. Please checkout main.py
 
